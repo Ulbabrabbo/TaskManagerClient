@@ -15,6 +15,8 @@ public class TaskApiClient {
 
     private final RestClient restClient;
 
+    // TODO ResourceAccessException handling
+
     public TaskApiClient(RestClient restClient) {
         this.restClient = restClient;
     }
@@ -26,6 +28,12 @@ public class TaskApiClient {
                 .uri("/api/tasks")
                 .body(task)
                 .retrieve()
+                .onStatus(status -> status.value() == 400, (request, response) -> {
+                    throw new IllegalArgumentException("Dati del task non validi \n");
+                })
+                .onStatus(status -> status.is5xxServerError(), (request, response) ->{
+                    throw new RuntimeException("errore interno del server\n");
+                })
                 .body(Task.class);
     }
 
@@ -35,6 +43,9 @@ public class TaskApiClient {
         return restClient.get()
                 .uri("/api/tasks")
                 .retrieve()
+                .onStatus(status -> status.is5xxServerError(), (request, response) ->{
+                    throw new RuntimeException("errore interno del server\n");
+                })
                 .body(new ParameterizedTypeReference<>() {});  // deserializza in classe generica
     }
 
@@ -47,6 +58,9 @@ public class TaskApiClient {
                 .onStatus(status -> status.value() == 404, (request, response) ->{
                     throw new TaskNotFoundException(id);
                 })
+                .onStatus(status -> status.is5xxServerError(), (request, response) ->{
+                    throw new RuntimeException("errore interno del server\n");
+                })
                 .body(Task.class);   // deserializza Json in Task
     }
 
@@ -57,8 +71,14 @@ public class TaskApiClient {
                 .uri("/api/tasks/{id}", id)
                 .body(task)
                 .retrieve()
+                .onStatus(status -> status.value() == 400, (request, response) -> {
+                    throw new IllegalArgumentException("Dati del task non validi \n");
+                })
                 .onStatus(status -> status.value() == 404, (request, response) ->{
                     throw new TaskNotFoundException(id);
+                })
+                .onStatus(status -> status.is5xxServerError(), (request, response) ->{
+                    throw new RuntimeException("errore interno del server\n");
                 })
                 .body(Task.class);
     }
@@ -72,19 +92,25 @@ public class TaskApiClient {
                 .onStatus(status -> status.value() == 404, (request, response) ->{
                     throw new TaskNotFoundException(id);
                 })
+                .onStatus(status -> status.is5xxServerError(), (request, response) ->{
+                    throw new RuntimeException("errore interno del server\n");
+                })
                 .toBodilessEntity();
     }
 
 
     // GET /api/tasks?status={status}
-    public List<Task> getTasksByStatus(Status status) {
+    public List<Task> getTasksByStatus(Status myStatus) {
 
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/tasks")
-                        .queryParam("status", status)
+                        .queryParam("status", myStatus)
                         .build())
                 .retrieve()
+                .onStatus(status -> status.is5xxServerError(), (request, response) ->{
+                    throw new RuntimeException("errore interno del server\n");
+                })
                 .body(new ParameterizedTypeReference<>() {});
     }
 }

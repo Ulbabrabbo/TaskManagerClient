@@ -6,6 +6,7 @@ import org.prova.clienttaskmanager.data.Task;
 import org.prova.clienttaskmanager.exception.TaskNotFoundException;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.util.ArrayList;
 import java.util.InputMismatchException;
@@ -28,7 +29,6 @@ public class TaskMenu implements CommandLineRunner {
         boolean running = true;
 
         while(running){
-
             System.out.println("Selezionare la funzione da eseguire:\n" +
                     "1: Creare un nuovo task\n" +
                     "2: Visualizzare tutti i task\n" +
@@ -63,6 +63,7 @@ public class TaskMenu implements CommandLineRunner {
         }
     }
 
+
     private void createTask() {
         System.out.print("Inserire titolo: ");
         String title = input.nextLine();
@@ -92,29 +93,45 @@ public class TaskMenu implements CommandLineRunner {
                 break;
         }
 
-        Task taskCreated = taskService.createNewTask(title, description, status);
-        System.out.println("Creato nuovo task: \n");
-        System.out.println("id: " + taskCreated.getId() + "\n" +
-                "titolo: " + taskCreated.getTitle() + "\n" +
-                "descrizione: " + taskCreated.getDescription() + "\n" +
-                "status: " + taskCreated.getStatus() + "\n");
+        try {
+            Task taskCreated = taskService.createNewTask(title, description, status);
+            System.out.println("Creato nuovo task: \n");
+            System.out.println("id: " + taskCreated.getId() + "\n" +
+                    "titolo: " + taskCreated.getTitle() + "\n" +
+                    "descrizione: " + taskCreated.getDescription() + "\n" +
+                    "status: " + taskCreated.getStatus() + "\n");
+        } catch (IllegalArgumentException e){
+            System.out.println(e.getMessage());
+        } catch (RuntimeException e){
+            System.out.println(e.getMessage());
+        }
+
+
     }
 
-    private void showAllTask() {
-        List<Task> taskList = taskService.showTaskList();
 
-        if (taskList.isEmpty()) {
-            System.out.println("Non ci sono task nella lista.\n");
-            return;
+
+    private void showAllTask() {
+
+        try {
+            List<Task> taskList = taskService.showTaskList();
+            if (taskList.isEmpty()) {
+                System.out.println("Non ci sono task nella lista.\n");
+                return;
+            }
+            System.out.println("Lista di tutti i task: ");
+            taskList.stream()
+                    .forEach(task -> {
+                        System.out.println("id: " + task.getId() + "\n" +
+                                "titolo: " + task.getTitle() + "\n" +
+                                "descrizione: " + task.getDescription() + "\n" +
+                                "status: " + task.getStatus() + "\n");
+                    });
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
         }
-        System.out.println("Lista di tutti i task: ");
-        taskList.stream()
-                .forEach(task -> {
-                    System.out.println("id: " + task.getId() + "\n" +
-                            "titolo: " + task.getTitle() + "\n" +
-                            "descrizione: " + task.getDescription() + "\n" +
-                            "status: " + task.getStatus() + "\n");
-                });
+
+
     }
 
     private void searchTaskById() {
@@ -132,6 +149,8 @@ public class TaskMenu implements CommandLineRunner {
 
         } catch (TaskNotFoundException e){
             System.out.println(e.getMessage() + "\n");
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
         }
     }
 
@@ -141,78 +160,81 @@ public class TaskMenu implements CommandLineRunner {
         int idToSearch = input.nextInt();
         input.nextLine();
 
-
         try{
-        Task foundTask = taskService.searchTask(idToSearch);
+            Task foundTask = taskService.searchTask(idToSearch);
 
-            System.out.println("Selezionare il campo da modificare tra: \n" +
-                    "1: Titolo \n" +
-                    "2: Descrizione \n" +
-                    "3: Status");
+                System.out.println("Selezionare il campo da modificare tra: \n" +
+                        "1: Titolo \n" +
+                        "2: Descrizione \n" +
+                        "3: Status");
+                String choice = input.nextLine();
 
-            String choice = input.nextLine();
+               switch (choice) {
+                    case "1":
+                        System.out.print("Inserire nuovo titolo: ");
+                        String newTitle = input.nextLine();
+                        taskService.modifyTask(idToSearch, new Task(
+                                newTitle,
+                                foundTask.getDescription(),
+                                foundTask.getStatus()
+                        ));
+                        break;
 
-            switch (choice) {
-                case "1":
-                    System.out.print("Inserire nuovo titolo: ");
-                    String newTitle = input.nextLine();
-                    taskService.modifyTask(idToSearch, new Task(
-                            newTitle,
-                            foundTask.getDescription(),
-                            foundTask.getStatus()
-                    ));
-                    break;
+                    case "2":
+                        System.out.print("Inserire nuova descrizione: ");
+                        String newDescription = input.nextLine();
+                        taskService.modifyTask(idToSearch, new Task(
+                                foundTask.getTitle(),
+                                newDescription,
+                                foundTask.getStatus()
+                        ));
+                        break;
 
-                case "2":
-                    System.out.print("Inserire nuova descrizione: ");
-                    String newDescription = input.nextLine();
-                    taskService.modifyTask(idToSearch, new Task(
-                            foundTask.getTitle(),
-                            newDescription,
-                            foundTask.getStatus()
-                    ));
-                    break;
+                    case "3":
+                        System.out.print("Selezionare il nuova stato tra: \n" +
+                                "1): TODO\n" +
+                                "2): IN_PROGRESS\n" +
+                                "3): DONE\n");
 
-                case "3":
-                    System.out.print("Selezionare il nuova stato tra: \n" +
-                            "1): TODO\n" +
-                            "2): IN_PROGRESS\n" +
-                            "3): DONE\n");
+                        Status status;
+                        String statusSelection = input.nextLine();
+                        switch (statusSelection) {
+                            case "1":
+                                status = Status.TODO;
+                                break;
+                            case "2":
+                                status = Status.IN_PROGRESS;
+                                break;
+                            case "3":
+                                status = Status.DONE;
+                                break;
+                            default:
+                                System.out.println("Scelta non valida!\n");
+                                return;
+                        }
 
-                    Status status;
-                    String statusSelection = input.nextLine();
-                    switch (statusSelection) {
-                        case "1":
-                            status = Status.TODO;
-                            break;
-                        case "2":
-                            status = Status.IN_PROGRESS;
-                            break;
-                        case "3":
-                            status = Status.DONE;
-                            break;
-                        default:
-                            System.out.println("Scelta non valida!\n");
-                            return;
-                    }
+                        taskService.modifyTask(idToSearch, new Task(
+                                foundTask.getTitle(),
+                                foundTask.getDescription(),
+                                status
+                        ));
+                        break;
 
-                    taskService.modifyTask(idToSearch, new Task(
-                            foundTask.getTitle(),
-                            foundTask.getDescription(),
-                            status
-                    ));
-                    break;
+                    default:
+                        System.out.println("Scelta non valida\n");
 
-                default:
-                    System.out.println("Scelta non valida\n");
+               }
 
-            }
-
+        } catch (IllegalArgumentException e){
+            System.out.println(e.getMessage());
         } catch(TaskNotFoundException e){
+            System.out.println(e.getMessage());
+        } catch (RuntimeException e) {
             System.out.println(e.getMessage());
         }
 
     }
+
 
     private void deleteTask() {
         System.out.print("Inserire Id del task da eliminare: ");
@@ -221,11 +243,15 @@ public class TaskMenu implements CommandLineRunner {
 
         try {
             taskService.deleteTask(idToDelete);
-
         } catch(TaskNotFoundException e){
             System.out.println(e.getMessage());
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
         }
+
+
     }
+
 
     private void filterTask() {
         List<Task> filteredList = new ArrayList<>();
@@ -237,37 +263,43 @@ public class TaskMenu implements CommandLineRunner {
 
         Status status;
         String statusSelection = input.nextLine();
-        switch (statusSelection) {
-            case "1":
-                status = Status.TODO;
-                filteredList = taskService.filterTask(status);
-                break;
-            case "2":
-                status = Status.IN_PROGRESS;
-                filteredList = taskService.filterTask(status);
-                break;
-            case "3":
-                status = Status.DONE;
-                filteredList = taskService.filterTask(status);
-                break;
-            default:
-                System.out.println("Scelta non valida!\n");
-                return;
+        try {
+            switch (statusSelection) {
+                case "1":
+                    status = Status.TODO;
+                    filteredList = taskService.filterTask(status);
+                    break;
+                case "2":
+                    status = Status.IN_PROGRESS;
+                    filteredList = taskService.filterTask(status);
+                    break;
+                case "3":
+                    status = Status.DONE;
+                    filteredList = taskService.filterTask(status);
+                    break;
+                default:
+                    System.out.println("Scelta non valida!\n");
+                    return;
+            }
+
+            if(filteredList.isEmpty())  {
+                System.out.println("La lista è vuota\n");
+            }
+            else {
+                System.out.println("Lista filtrata dei task: ");
+                filteredList.stream()
+                        .forEach(task -> {
+                            System.out.println("id: " + task.getId() + "\n" +
+                                    "titolo: " + task.getTitle() + "\n" +
+                                    "descrizione: " + task.getDescription() + "\n" +
+                                    "status: " + task.getStatus() + "\n");
+                        });
+            }
+
+        } catch (RuntimeException e) {
+            System.out.println(e.getMessage());
         }
 
-        if(filteredList.isEmpty())  {
-            System.out.println("La lista è vuota\n");
-        }
-        else {
-            System.out.println("Lista filtrata dei task: ");
-            filteredList.stream()
-                    .forEach(task -> {
-                        System.out.println("id: " + task.getId() + "\n" +
-                                "titolo: " + task.getTitle() + "\n" +
-                                "descrizione: " + task.getDescription() + "\n" +
-                                "status: " + task.getStatus() + "\n");
-                    });
-        }
 
     }
 }
