@@ -1,17 +1,15 @@
 package org.prova.clienttaskmanager;
 
-import jakarta.validation.constraints.Null;
 import org.prova.clienttaskmanager.data.Status;
 import org.prova.clienttaskmanager.data.Task;
-import org.prova.clienttaskmanager.exception.TaskNotFoundException;
+import org.prova.clienttaskmanager.data.TaskReceived;
+import org.prova.clienttaskmanager.exception.ApiException;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 
-import java.util.ArrayList;
-import java.util.InputMismatchException;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 @Component
 public class TaskMenu implements CommandLineRunner {
@@ -94,31 +92,35 @@ public class TaskMenu implements CommandLineRunner {
         }
 
         try {
-            Task taskCreated = taskService.createNewTask(title, description, status);
-            System.out.println("Creato nuovo task: \n");
+            TaskReceived<Task> taskReceived = taskService.createNewTask(title, description, status);
+            Task taskCreated = taskReceived.getData();
+            System.out.println("\nHttp Status: " + taskReceived.getStatusCode());
+            System.out.println("Creato nuovo task: ");
             System.out.println("id: " + taskCreated.getId() + "\n" +
                     "titolo: " + taskCreated.getTitle() + "\n" +
                     "descrizione: " + taskCreated.getDescription() + "\n" +
                     "status: " + taskCreated.getStatus() + "\n");
-        } catch (IllegalArgumentException e){
-            System.out.println(e.getMessage());
-        } catch (RuntimeException e){
-            System.out.println(e.getMessage());
+        } catch (ApiException e) {
+            ProblemDetail problem = e.getProblemDetail();
+            System.out.println("Http Status: " + problem.getStatus());
+            System.out.println("errore: " + problem.getDetail());
+        } catch (ResourceAccessException e) {
+            System.out.println("Errore: impossibile raggiungere il server.");
         }
 
 
     }
 
-
-
     private void showAllTask() {
 
         try {
-            List<Task> taskList = taskService.showTaskList();
+            TaskReceived<List<Task>> taskListReceived = taskService.showTaskList();
+            List<Task> taskList = taskListReceived.getData();
             if (taskList.isEmpty()) {
                 System.out.println("Non ci sono task nella lista.\n");
                 return;
             }
+            System.out.println("\nHttp Status: " + taskListReceived.getStatusCode());
             System.out.println("Lista di tutti i task: ");
             taskList.stream()
                     .forEach(task -> {
@@ -127,8 +129,13 @@ public class TaskMenu implements CommandLineRunner {
                                 "descrizione: " + task.getDescription() + "\n" +
                                 "status: " + task.getStatus() + "\n");
                     });
-        } catch (RuntimeException e) {
-            System.out.println(e.getMessage());
+
+        } catch (ApiException e) {
+            ProblemDetail problem = e.getProblemDetail();
+            System.out.println("Http Status: " + problem.getStatus());
+            System.out.println("errore: " + problem.getDetail());
+        } catch (ResourceAccessException e) {
+            System.out.println("Errore: impossibile raggiungere il server.");
         }
 
 
@@ -140,17 +147,23 @@ public class TaskMenu implements CommandLineRunner {
         input.nextLine();
 
         try {
-            Task taskFound = taskService.searchTask(idToSearch);
+            TaskReceived<Task> taskReceived = taskService.searchTask(idToSearch);
+            Task taskFound = taskReceived.getData();
+            System.out.println("\nHttp Status: " + taskReceived.getStatusCode());
             System.out.println("Trovato task:");
             System.out.println("id: " + taskFound.getId() + "\n" +
                     "titolo: " + taskFound.getTitle() + "\n" +
                     "descrizione: " + taskFound.getDescription() + "\n" +
                     "status: " + taskFound.getStatus() + "\n");
 
-        } catch (TaskNotFoundException e){
-            System.out.println(e.getMessage() + "\n");
-        } catch (RuntimeException e) {
-            System.out.println(e.getMessage());
+        } catch (ApiException e) {
+            ProblemDetail problem;
+            problem = e.getProblemDetail();
+            System.out.println("Http Status: " + problem.getStatus());
+            System.out.println("errore :" + problem.getDetail());
+
+        } catch (ResourceAccessException e) {
+            System.out.println("Errore: impossibile raggiungere il server.");
         }
     }
 
@@ -161,15 +174,16 @@ public class TaskMenu implements CommandLineRunner {
         input.nextLine();
 
         try{
-            Task foundTask = taskService.searchTask(idToSearch);
+            TaskReceived<Task> taskReceived = taskService.searchTask(idToSearch);
+            Task foundTask = taskReceived.getData();
 
-                System.out.println("Selezionare il campo da modificare tra: \n" +
-                        "1: Titolo \n" +
-                        "2: Descrizione \n" +
-                        "3: Status");
-                String choice = input.nextLine();
+            System.out.println("Selezionare il campo da modificare tra: \n" +
+                    "1: Titolo \n" +
+                    "2: Descrizione \n" +
+                    "3: Status");
+            String choice = input.nextLine();
 
-               switch (choice) {
+            switch (choice) {
                     case "1":
                         System.out.print("Inserire nuovo titolo: ");
                         String newTitle = input.nextLine();
@@ -178,6 +192,8 @@ public class TaskMenu implements CommandLineRunner {
                                 foundTask.getDescription(),
                                 foundTask.getStatus()
                         ));
+                        System.out.println("\nHttp Status: " + taskReceived.getStatusCode());
+                        System.out.println("Task con id: " + foundTask.getId() + " modificato!");
                         break;
 
                     case "2":
@@ -188,6 +204,8 @@ public class TaskMenu implements CommandLineRunner {
                                 newDescription,
                                 foundTask.getStatus()
                         ));
+                        System.out.println("\nHttp Status: " + taskReceived.getStatusCode());
+                        System.out.println("Task con id: " + foundTask.getId() + " modificato!");
                         break;
 
                     case "3":
@@ -218,19 +236,23 @@ public class TaskMenu implements CommandLineRunner {
                                 foundTask.getDescription(),
                                 status
                         ));
+                        System.out.println("\nHttp Status: " + taskReceived.getStatusCode());
+                        System.out.println("Task con id: " + foundTask.getId() + " modificato!");
                         break;
 
                     default:
                         System.out.println("Scelta non valida\n");
 
-               }
+            }
 
-        } catch (IllegalArgumentException e){
-            System.out.println(e.getMessage());
-        } catch(TaskNotFoundException e){
-            System.out.println(e.getMessage());
-        } catch (RuntimeException e) {
-            System.out.println(e.getMessage());
+        } catch (ApiException e) {
+            ProblemDetail problem;
+            problem = e.getProblemDetail();
+            System.out.println("Http Status: " + problem.getStatus());
+            System.out.println("errore :" + problem.getDetail());
+
+        } catch (ResourceAccessException e) {
+            System.out.println("Errore: impossibile raggiungere il server.");
         }
 
     }
@@ -242,20 +264,23 @@ public class TaskMenu implements CommandLineRunner {
         input.nextLine();
 
         try {
-            taskService.deleteTask(idToDelete);
-        } catch(TaskNotFoundException e){
-            System.out.println(e.getMessage());
-        } catch (RuntimeException e) {
-            System.out.println(e.getMessage());
+            TaskReceived <Void> taskReceived = taskService.deleteTask(idToDelete);
+            System.out.println("\nHttp status: " + taskReceived.getStatusCode());
+            System.out.println("Task con id: " + idToDelete + " eliminato!");
+
+        } catch (ApiException e) {
+            ProblemDetail problem;
+            problem = e.getProblemDetail();
+            System.out.println("Http Status: " + problem.getStatus());
+            System.out.println("errore :" + problem.getDetail());
+
+        } catch (ResourceAccessException e) {
+            System.out.println("Errore: impossibile raggiungere il server.");
         }
-
-
     }
 
 
     private void filterTask() {
-        List<Task> filteredList = new ArrayList<>();
-
         System.out.println("Selezionare lo status secondo cui filtrare tra: \n" +
                 "1): TODO\n" +
                 "2): IN_PROGRESS\n" +
@@ -263,31 +288,34 @@ public class TaskMenu implements CommandLineRunner {
 
         Status status;
         String statusSelection = input.nextLine();
+        TaskReceived<List<Task>> taskListReceived;
         try {
             switch (statusSelection) {
                 case "1":
                     status = Status.TODO;
-                    filteredList = taskService.filterTask(status);
+                    taskListReceived = taskService.filterTask(status);
                     break;
                 case "2":
                     status = Status.IN_PROGRESS;
-                    filteredList = taskService.filterTask(status);
+                    taskListReceived = taskService.filterTask(status);
                     break;
                 case "3":
                     status = Status.DONE;
-                    filteredList = taskService.filterTask(status);
+                    taskListReceived = taskService.filterTask(status);
                     break;
                 default:
                     System.out.println("Scelta non valida!\n");
                     return;
             }
 
-            if(filteredList.isEmpty())  {
+            if(taskListReceived.getData().isEmpty())  {
+                System.out.println("\nHttp Status: " + taskListReceived.getStatusCode());
                 System.out.println("La lista è vuota\n");
             }
             else {
+                System.out.println("\nHttp Status: " + taskListReceived.getStatusCode());
                 System.out.println("Lista filtrata dei task: ");
-                filteredList.stream()
+                taskListReceived.getData().stream()
                         .forEach(task -> {
                             System.out.println("id: " + task.getId() + "\n" +
                                     "titolo: " + task.getTitle() + "\n" +
@@ -296,8 +324,14 @@ public class TaskMenu implements CommandLineRunner {
                         });
             }
 
-        } catch (RuntimeException e) {
-            System.out.println(e.getMessage());
+        } catch (ApiException e) {
+            ProblemDetail problem;
+            problem = e.getProblemDetail();
+            System.out.println("Http Status: " + problem.getStatus());
+            System.out.println("errore :" + problem.getDetail());
+
+        } catch (ResourceAccessException e) {
+            System.out.println("Errore: impossibile raggiungere il server.");
         }
 
 
